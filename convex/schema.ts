@@ -5,6 +5,7 @@ export default defineSchema({
   tasks: defineTable({
     title: v.string(),
     description: v.optional(v.string()),
+    notes: v.optional(v.string()),
     status: v.union(
       v.literal("backlog"),
       v.literal("queued"),

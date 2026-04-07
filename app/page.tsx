@@ -10,6 +10,7 @@ type Task = {
   _creationTime: number;
   title: string;
   description?: string;
+  notes?: string;
   status: "backlog" | "queued" | "done";
   priority?: number;
   completedAt?: number;
@@ -27,8 +28,10 @@ export default function Home() {
   const updateTask = useMutation(api.tasks.update);
 
   const [newTitle, setNewTitle] = useState("");
+  const [expandedId, setExpandedId] = useState<Id<"tasks"> | null>(null);
   const [editingId, setEditingId] = useState<Id<"tasks"> | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const doneTasks = (allTasks ?? [])
@@ -71,121 +74,135 @@ export default function Home() {
     [queuedTasks, reorder]
   );
 
-  const startEdit = (task: Task) => {
+  const toggleExpand = (task: Task) => {
+    if (expandedId === task._id) {
+      setExpandedId(null);
+      setEditingId(null);
+    } else {
+      setExpandedId(task._id);
+      setEditNotes(task.notes ?? "");
+    }
+  };
+
+  const startEditTitle = (task: Task) => {
     setEditingId(task._id);
     setEditTitle(task.title);
   };
 
-  const saveEdit = async () => {
+  const saveTitle = async () => {
     if (editingId && editTitle.trim()) {
       await updateTask({ id: editingId, title: editTitle.trim() });
     }
     setEditingId(null);
   };
 
-  const TaskTitle = ({ task }: { task: Task }) => {
-    if (editingId === task._id) {
-      return (
-        <input
-          type="text"
-          value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") saveEdit();
-            if (e.key === "Escape") setEditingId(null);
-          }}
-          onBlur={saveEdit}
-          autoFocus
-          className="flex-1 bg-neutral-900 border border-neutral-700 rounded px-2 py-0.5 text-sm focus:outline-none focus:border-neutral-500"
-        />
-      );
-    }
-    return (
-      <span
-        className="flex-1 text-sm text-neutral-200 truncate cursor-pointer"
-        onDoubleClick={() => startEdit(task)}
-        title={task.description || undefined}
-      >
-        {task.title}
-      </span>
-    );
+  const saveNotes = async (taskId: Id<"tasks">, notes: string) => {
+    await updateTask({ id: taskId, notes });
   };
 
   if (!allTasks) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-neutral-500">Loading...</div>
+        <p className="font-[family-name:var(--font-pixel)] text-xs text-earth-400 animate-pulse">
+          Loading farm...
+        </p>
       </div>
     );
   }
 
+  // Season based on month
+  const month = new Date().getMonth();
+  const season =
+    month >= 2 && month <= 4
+      ? "Spring"
+      : month >= 5 && month <= 7
+        ? "Summer"
+        : month >= 8 && month <= 10
+          ? "Fall"
+          : "Winter";
+  const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const dayNum = new Date().getDate();
+
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header with global add */}
-      <header className="border-b border-neutral-800 px-6 py-4 flex items-center gap-4">
-        <div className="shrink-0">
-          <h1 className="text-lg font-semibold tracking-tight">Priority Queue</h1>
-          <p className="text-sm text-neutral-500 mt-0.5">
-            {queuedTasks.length} queued &middot; {backlogTasks.length} backlog &middot; {doneTasks.length} done
-          </p>
+    <div className="min-h-screen flex flex-col bg-earth-950">
+      {/* Top bar — Stardew-style day/season header */}
+      <header className="bg-earth-900 px-4 py-3 flex items-center gap-4 border-b-4 border-earth-700">
+        <div className="pixel-border-gold bg-earth-800 px-4 py-2">
+          <h1 className="font-[family-name:var(--font-pixel)] text-[10px] text-gold-300 leading-relaxed">
+            Farm Tasks
+          </h1>
         </div>
-        <div className="flex-1 max-w-xl ml-auto">
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="Add task to backlog..."
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-3 py-1.5 text-sm placeholder:text-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors"
-            />
-            <button
-              onClick={handleCreate}
-              disabled={!newTitle.trim()}
-              className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 text-sm rounded-md transition-colors"
-            >
-              Add
-            </button>
-          </div>
+        <div className="font-[family-name:var(--font-pixel)] text-[8px] text-earth-400 leading-relaxed">
+          <span className="text-leaf-400">{season}</span>{" "}
+          <span className="text-earth-300">{dayNum}</span>{" "}
+          <span className="text-earth-500">({dayOfWeek})</span>
+        </div>
+        <div className="font-[family-name:var(--font-pixel)] text-[8px] text-earth-600 ml-auto leading-relaxed">
+          {queuedTasks.length}Q &middot; {backlogTasks.length}B &middot;{" "}
+          {doneTasks.length}D
+        </div>
+
+        {/* Add task input */}
+        <div className="flex gap-2 ml-4">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="New task..."
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            className="pixel-inset bg-earth-900 px-3 py-1.5 text-sm text-earth-200 placeholder:text-earth-600 focus:outline-none w-56"
+          />
+          <button
+            onClick={handleCreate}
+            disabled={!newTitle.trim()}
+            className="pixel-border bg-earth-800 px-3 py-1 font-[family-name:var(--font-pixel)] text-[8px] text-earth-300 hover:bg-earth-700 hover:text-gold-300 disabled:opacity-30 transition-colors leading-relaxed"
+          >
+            + Add
+          </button>
         </div>
       </header>
 
-      {/* Three columns: Done | Queue | Backlog */}
+      {/* Three columns */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Done */}
-        <aside className="w-72 border-r border-neutral-800 flex flex-col bg-neutral-950/50 shrink-0">
-          <div className="px-4 py-3 border-b border-neutral-800">
-            <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
-              Done <span className="text-neutral-700">({doneTasks.length})</span>
+        {/* LEFT: Shipping Bin (Done) */}
+        <aside className="w-72 flex flex-col bg-earth-950 border-r-4 border-earth-800 shrink-0">
+          <div className="bg-earth-900 px-3 py-2 border-b-2 border-earth-800">
+            <h2 className="font-[family-name:var(--font-pixel)] text-[8px] text-leaf-400 leading-relaxed">
+              Shipped
+              <span className="text-earth-600 ml-2">({doneTasks.length})</span>
             </h2>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {doneTasks.length === 0 && (
-              <p className="text-sm text-neutral-700 px-2 py-6 text-center">
-                Nothing completed yet
+              <p className="text-xs text-earth-700 text-center py-6">
+                Nothing shipped yet...
               </p>
             )}
             {doneTasks.map((task) => (
               <div
                 key={task._id}
-                className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-neutral-900 transition-colors"
+                className="group flex items-start gap-2 px-2 py-1.5 rounded hover:bg-earth-900 transition-colors"
               >
-                <span className="text-sm text-neutral-600 line-through flex-1 truncate">
-                  {task.title}
+                <span className="text-leaf-600 text-xs mt-0.5 shrink-0">
+                  &#10003;
                 </span>
-                <span className="text-[10px] text-neutral-700 shrink-0">
-                  {task.completedAt
-                    ? new Date(task.completedAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : ""}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-earth-600 line-through block truncate">
+                    {task.title}
+                  </span>
+                  <span className="text-[10px] text-earth-700">
+                    {task.completedAt
+                      ? new Date(task.completedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : ""}
+                  </span>
+                </div>
                 <button
                   onClick={() => moveToQueue({ id: task._id })}
-                  className="opacity-0 group-hover:opacity-100 text-[10px] text-neutral-600 hover:text-amber-400 transition-all"
-                  title="Undo"
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-earth-600 hover:text-gold-400 transition-all shrink-0"
                 >
                   undo
                 </button>
@@ -194,123 +211,301 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* Center: Priority Queue */}
-        <section className="flex-1 flex flex-col overflow-hidden border-r border-neutral-800">
-          <div className="px-4 py-3 border-b border-neutral-800 bg-neutral-900/30">
-            <h2 className="text-sm font-semibold text-neutral-200 uppercase tracking-wider">
-              Priority Queue <span className="text-neutral-500 font-normal">({queuedTasks.length})</span>
+        {/* CENTER: Priority Queue (the farm board) */}
+        <section className="flex-1 flex flex-col overflow-hidden">
+          <div className="bg-earth-800 px-4 py-3 border-b-4 border-earth-700">
+            <h2 className="font-[family-name:var(--font-pixel)] text-[10px] text-gold-300 leading-relaxed">
+              Today&apos;s Orders
             </h2>
-            <p className="text-xs text-neutral-600 mt-0.5">Ordered by priority. Top = do first.</p>
+            <p className="text-[10px] text-earth-500 mt-1">
+              Your priority queue &mdash; top task = do first
+            </p>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          <div className="flex-1 overflow-y-auto p-3 space-y-1">
             {queuedTasks.length === 0 && (
-              <p className="text-sm text-neutral-700 py-8 text-center">
-                Queue is empty. Move items from backlog →
-              </p>
+              <div className="text-center py-12">
+                <p className="font-[family-name:var(--font-pixel)] text-[8px] text-earth-600 leading-loose">
+                  No orders today.
+                </p>
+                <p className="text-xs text-earth-700 mt-2">
+                  Move items from the backlog &rarr;
+                </p>
+              </div>
             )}
             {queuedTasks.map((task, index) => (
-              <div
-                key={task._id}
-                className="group flex items-center gap-2 px-3 py-2 rounded-md hover:bg-neutral-900/80 border border-transparent hover:border-neutral-800 transition-all"
-              >
-                <span className="text-xs text-neutral-600 w-5 text-right shrink-0 font-mono">
-                  {index + 1}
-                </span>
+              <div key={task._id}>
+                <div
+                  className={`group flex items-center gap-2 px-3 py-2 transition-all cursor-pointer ${
+                    index === 0
+                      ? "pixel-border-gold bg-earth-800"
+                      : "pixel-border bg-earth-900 hover:bg-earth-800"
+                  }`}
+                  onClick={() => toggleExpand(task)}
+                >
+                  {/* Priority badge */}
+                  <span
+                    className={`font-[family-name:var(--font-pixel)] text-[8px] w-6 text-center shrink-0 leading-relaxed ${
+                      index === 0 ? "text-gold-400" : "text-earth-600"
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
 
-                <button
-                  onClick={() => markDone({ id: task._id })}
-                  className="w-4 h-4 rounded-full border border-neutral-700 hover:border-emerald-500 hover:bg-emerald-500/20 transition-colors shrink-0"
-                  title="Mark done"
-                />
+                  {/* Checkbox */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markDone({ id: task._id });
+                    }}
+                    className={`w-4 h-4 shrink-0 border-2 transition-colors ${
+                      index === 0
+                        ? "border-gold-500 hover:bg-leaf-500 hover:border-leaf-500"
+                        : "border-earth-600 hover:bg-leaf-600 hover:border-leaf-600"
+                    }`}
+                    title="Ship it!"
+                  />
 
-                <TaskTitle task={task} />
+                  {/* Title */}
+                  {editingId === task._id ? (
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveTitle();
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      onBlur={saveTitle}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      className="flex-1 pixel-inset bg-earth-900 px-2 py-0.5 text-sm text-earth-200 focus:outline-none"
+                    />
+                  ) : (
+                    <span
+                      className={`flex-1 text-sm truncate ${
+                        index === 0 ? "text-earth-100" : "text-earth-300"
+                      }`}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        startEditTitle(task);
+                      }}
+                    >
+                      {task.title}
+                      {task.notes && (
+                        <span className="text-earth-600 text-[10px] ml-2">
+                          [notes]
+                        </span>
+                      )}
+                    </span>
+                  )}
 
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
-                  <button
-                    onClick={() => handleMoveUp(index)}
-                    disabled={index === 0}
-                    className="text-neutral-500 hover:text-neutral-300 disabled:opacity-20 p-0.5 text-xs"
-                    title="Move up"
+                  {/* Expand indicator */}
+                  <span
+                    className={`text-earth-600 text-xs shrink-0 transition-transform ${
+                      expandedId === task._id ? "rotate-90" : ""
+                    }`}
                   >
-                    ▲
-                  </button>
-                  <button
-                    onClick={() => handleMoveDown(index)}
-                    disabled={index === queuedTasks.length - 1}
-                    className="text-neutral-500 hover:text-neutral-300 disabled:opacity-20 p-0.5 text-xs"
-                    title="Move down"
+                    &#9654;
+                  </span>
+
+                  {/* Action buttons */}
+                  <div
+                    className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    ▼
-                  </button>
-                  <button
-                    onClick={() => moveToBacklog({ id: task._id })}
-                    className="text-[10px] text-neutral-600 hover:text-amber-400 px-1 transition-colors"
-                    title="Send back to backlog"
-                  >
-                    backlog
-                  </button>
-                  <button
-                    onClick={() => removeTask({ id: task._id })}
-                    className="text-xs text-neutral-600 hover:text-red-400 px-0.5 transition-colors"
-                    title="Delete"
-                  >
-                    &times;
-                  </button>
+                    <button
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                      className="text-earth-500 hover:text-gold-400 disabled:opacity-20 px-0.5 text-xs"
+                    >
+                      &#9650;
+                    </button>
+                    <button
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === queuedTasks.length - 1}
+                      className="text-earth-500 hover:text-gold-400 disabled:opacity-20 px-0.5 text-xs"
+                    >
+                      &#9660;
+                    </button>
+                    <button
+                      onClick={() => moveToBacklog({ id: task._id })}
+                      className="text-[10px] text-earth-600 hover:text-earth-400 px-1"
+                    >
+                      stash
+                    </button>
+                    <button
+                      onClick={() => removeTask({ id: task._id })}
+                      className="text-[10px] text-earth-600 hover:text-berry-400 px-0.5"
+                    >
+                      &#10005;
+                    </button>
+                  </div>
                 </div>
+
+                {/* Expanded notes panel */}
+                {expandedId === task._id && (
+                  <div className="pixel-inset bg-earth-950 mx-2 mt-0 p-3">
+                    <label className="font-[family-name:var(--font-pixel)] text-[7px] text-earth-500 block mb-2 leading-relaxed">
+                      Notes:
+                    </label>
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      onBlur={() => saveNotes(task._id, editNotes)}
+                      placeholder="Write notes here..."
+                      rows={3}
+                      className="w-full bg-earth-900 text-sm text-earth-200 placeholder:text-earth-700 p-2 pixel-inset focus:outline-none resize-y"
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => {
+                          saveNotes(task._id, editNotes);
+                          setExpandedId(null);
+                        }}
+                        className="pixel-border bg-earth-800 px-2 py-0.5 font-[family-name:var(--font-pixel)] text-[7px] text-leaf-400 hover:text-leaf-300 leading-relaxed"
+                      >
+                        Save
+                      </button>
+                      <span className="text-[10px] text-earth-700">
+                        (auto-saves on blur)
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </section>
 
-        {/* Right: Backlog */}
-        <aside className="w-80 flex flex-col bg-neutral-950/50 shrink-0">
-          <div className="px-4 py-3 border-b border-neutral-800">
-            <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
-              Backlog <span className="text-neutral-700">({backlogTasks.length})</span>
+        {/* RIGHT: Backlog (the seed bag) */}
+        <aside className="w-80 flex flex-col bg-earth-950 border-l-4 border-earth-800 shrink-0">
+          <div className="bg-earth-900 px-3 py-2 border-b-2 border-earth-800">
+            <h2 className="font-[family-name:var(--font-pixel)] text-[8px] text-sky-400 leading-relaxed">
+              Seed Bag
+              <span className="text-earth-600 ml-2">
+                ({backlogTasks.length})
+              </span>
             </h2>
+            <p className="text-[10px] text-earth-600 mt-0.5">
+              Unprioritized tasks
+            </p>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {backlogTasks.length === 0 && (
-              <p className="text-sm text-neutral-700 px-2 py-6 text-center">
-                Add tasks above — they land here first
+              <p className="text-xs text-earth-700 text-center py-6">
+                Add tasks above &mdash; they land here first
               </p>
             )}
             {backlogTasks.map((task) => (
-              <div
-                key={task._id}
-                className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-neutral-900 transition-colors"
-              >
-                <button
-                  onClick={() => moveToQueue({ id: task._id })}
-                  className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-neutral-800 text-neutral-500 hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
-                  title="Move to priority queue"
+              <div key={task._id}>
+                <div
+                  className="group flex items-center gap-2 px-2 py-1.5 hover:bg-earth-900 rounded transition-colors cursor-pointer"
+                  onClick={() => toggleExpand(task)}
                 >
-                  queue →
-                </button>
-
-                <TaskTitle task={task} />
-
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
                   <button
-                    onClick={() => markDone({ id: task._id })}
-                    className="text-[10px] text-neutral-600 hover:text-emerald-400 transition-colors"
-                    title="Mark done"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveToQueue({ id: task._id });
+                    }}
+                    className="shrink-0 pixel-border bg-earth-800 text-[8px] font-[family-name:var(--font-pixel)] px-1.5 py-0.5 text-sky-400 hover:text-gold-300 hover:bg-earth-700 transition-colors leading-relaxed"
+                    title="Plant this task in the queue"
                   >
-                    done
+                    Plant
                   </button>
-                  <button
-                    onClick={() => removeTask({ id: task._id })}
-                    className="text-xs text-neutral-600 hover:text-red-400 px-0.5 transition-colors"
-                    title="Delete"
+
+                  {editingId === task._id ? (
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveTitle();
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      onBlur={saveTitle}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      className="flex-1 pixel-inset bg-earth-900 px-2 py-0.5 text-sm text-earth-200 focus:outline-none"
+                    />
+                  ) : (
+                    <span
+                      className="flex-1 text-sm text-earth-400 truncate"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        startEditTitle(task);
+                      }}
+                    >
+                      {task.title}
+                      {task.notes && (
+                        <span className="text-earth-700 text-[10px] ml-1">
+                          [notes]
+                        </span>
+                      )}
+                    </span>
+                  )}
+
+                  <div
+                    className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    &times;
-                  </button>
+                    <button
+                      onClick={() => markDone({ id: task._id })}
+                      className="text-[10px] text-earth-600 hover:text-leaf-400"
+                    >
+                      done
+                    </button>
+                    <button
+                      onClick={() => removeTask({ id: task._id })}
+                      className="text-[10px] text-earth-600 hover:text-berry-400"
+                    >
+                      &#10005;
+                    </button>
+                  </div>
                 </div>
+
+                {/* Expanded notes panel */}
+                {expandedId === task._id && (
+                  <div className="pixel-inset bg-earth-950 mx-2 mt-1 mb-1 p-3">
+                    <label className="font-[family-name:var(--font-pixel)] text-[7px] text-earth-500 block mb-2 leading-relaxed">
+                      Notes:
+                    </label>
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      onBlur={() => saveNotes(task._id, editNotes)}
+                      placeholder="Write notes here..."
+                      rows={3}
+                      className="w-full bg-earth-900 text-sm text-earth-200 placeholder:text-earth-700 p-2 pixel-inset focus:outline-none resize-y"
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => {
+                          saveNotes(task._id, editNotes);
+                          setExpandedId(null);
+                        }}
+                        className="pixel-border bg-earth-800 px-2 py-0.5 font-[family-name:var(--font-pixel)] text-[7px] text-leaf-400 hover:text-leaf-300 leading-relaxed"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </aside>
       </div>
+
+      {/* Bottom bar — like the toolbar in Stardew */}
+      <footer className="bg-earth-900 border-t-4 border-earth-700 px-4 py-2 flex items-center justify-between">
+        <div className="font-[family-name:var(--font-pixel)] text-[7px] text-earth-600 leading-relaxed">
+          double-click to rename &middot; click row to expand notes &middot;
+          &#9650;&#9660; to reorder
+        </div>
+        <div className="font-[family-name:var(--font-pixel)] text-[7px] text-earth-700 leading-relaxed">
+          v1.0
+        </div>
+      </footer>
     </div>
   );
 }

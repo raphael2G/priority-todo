@@ -60,6 +60,7 @@ export const update = mutation({
     id: v.id("tasks"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
+    notes: v.optional(v.string()),
     priority: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -67,6 +68,7 @@ export const update = mutation({
     const updates: Record<string, unknown> = {};
     if (fields.title !== undefined) updates.title = fields.title;
     if (fields.description !== undefined) updates.description = fields.description;
+    if (fields.notes !== undefined) updates.notes = fields.notes;
     if (fields.priority !== undefined) updates.priority = fields.priority;
     await ctx.db.patch(id, updates);
   },
