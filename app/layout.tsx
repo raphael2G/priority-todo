@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Press_Start_2P } from "next/font/google";
 import ConvexClientProvider from "./ConvexClientProvider";
 import "./globals.css";
@@ -12,6 +12,12 @@ const pixelFont = Press_Start_2P({
 export const metadata: Metadata = {
   title: "Farm Tasks",
   description: "Personal task priority queue",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
