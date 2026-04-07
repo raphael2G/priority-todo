@@ -1,5 +1,11 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+
+async function requireAuth(ctx: MutationCtx, password: string) {
+  const expected = process.env.WRITE_PASSWORD;
+  if (!expected) throw new Error("Server not configured");
+  if (password !== expected) throw new Error("Invalid password");
+}
 
 export const list = query({
   args: {
@@ -22,8 +28,17 @@ export const list = query({
   },
 });
 
+export const verifyPassword = mutation({
+  args: { password: v.string() },
+  handler: async (ctx, args) => {
+    await requireAuth(ctx, args.password);
+    return true;
+  },
+});
+
 export const create = mutation({
   args: {
+    password: v.string(),
     title: v.string(),
     description: v.optional(v.string()),
     status: v.union(
@@ -33,7 +48,8 @@ export const create = mutation({
     priority: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // If adding to queue without explicit priority, put at the end
+    await requireAuth(ctx, args.password);
+
     let priority = args.priority;
     if (args.status === "queued" && priority === undefined) {
       const existing = await ctx.db
@@ -57,6 +73,7 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    password: v.string(),
     id: v.id("tasks"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -64,7 +81,8 @@ export const update = mutation({
     priority: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { id, ...fields } = args;
+    await requireAuth(ctx, args.password);
+    const { id, password: _, ...fields } = args;
     const updates: Record<string, unknown> = {};
     if (fields.title !== undefined) updates.title = fields.title;
     if (fields.description !== undefined) updates.description = fields.description;
@@ -75,8 +93,9 @@ export const update = mutation({
 });
 
 export const markDone = mutation({
-  args: { id: v.id("tasks") },
+  args: { password: v.string(), id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx, args.password);
     await ctx.db.patch(args.id, {
       status: "done",
       completedAt: Date.now(),
@@ -87,10 +106,12 @@ export const markDone = mutation({
 
 export const moveToQueue = mutation({
   args: {
+    password: v.string(),
     id: v.id("tasks"),
     priority: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuth(ctx, args.password);
     let priority = args.priority;
     if (priority === undefined) {
       const existing = await ctx.db
@@ -110,8 +131,9 @@ export const moveToQueue = mutation({
 });
 
 export const moveToBacklog = mutation({
-  args: { id: v.id("tasks") },
+  args: { password: v.string(), id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx, args.password);
     await ctx.db.patch(args.id, {
       status: "backlog",
       priority: undefined,
@@ -122,9 +144,11 @@ export const moveToBacklog = mutation({
 
 export const reorder = mutation({
   args: {
+    password: v.string(),
     taskIds: v.array(v.id("tasks")),
   },
   handler: async (ctx, args) => {
+    await requireAuth(ctx, args.password);
     for (let i = 0; i < args.taskIds.length; i++) {
       await ctx.db.patch(args.taskIds[i], { priority: i });
     }
@@ -132,8 +156,9 @@ export const reorder = mutation({
 });
 
 export const remove = mutation({
-  args: { id: v.id("tasks") },
+  args: { password: v.string(), id: v.id("tasks") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx, args.password);
     await ctx.db.delete(args.id);
   },
 });
