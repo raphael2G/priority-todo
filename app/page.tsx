@@ -3,7 +3,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 type Task = {
   _id: Id<"tasks">;
@@ -17,6 +17,40 @@ type Task = {
   createdAt: number;
 };
 
+function useNow(intervalMs = 60_000) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function formatAge(createdAt: number, now: number): string {
+  const diff = now - createdAt;
+  const mins = Math.floor(diff / 60_000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+  const weeks = Math.floor(days / 7);
+
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m`;
+  if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+  if (days < 7) return `${days}d ${hrs % 24}h`;
+  if (days < 30) return `${weeks}w ${days % 7}d`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ${days % 30}d`;
+}
+
+function ageColor(createdAt: number, now: number): string {
+  const days = (now - createdAt) / 86_400_000;
+  if (days < 1) return "text-leaf-400";       // fresh — green
+  if (days < 3) return "text-earth-400";      // fine
+  if (days < 7) return "text-gold-400";       // getting stale — gold
+  if (days < 14) return "text-gold-500";      // warning
+  return "text-berry-400";                     // old — red/berry
+}
+
 export default function Home() {
   const allTasks = useQuery(api.tasks.list, {});
   const createTask = useMutation(api.tasks.create);
@@ -27,6 +61,7 @@ export default function Home() {
   const removeTask = useMutation(api.tasks.remove);
   const updateTask = useMutation(api.tasks.update);
 
+  const now = useNow();
   const [newTitle, setNewTitle] = useState("");
   const [expandedId, setExpandedId] = useState<Id<"tasks"> | null>(null);
   const [editingId, setEditingId] = useState<Id<"tasks"> | null>(null);
@@ -299,6 +334,14 @@ export default function Home() {
                     </span>
                   )}
 
+                  {/* Age timer */}
+                  <span
+                    className={`font-[family-name:var(--font-pixel)] text-[7px] shrink-0 leading-relaxed ${ageColor(task.createdAt, now)}`}
+                    title={`Created ${new Date(task.createdAt).toLocaleDateString()}`}
+                  >
+                    {formatAge(task.createdAt, now)}
+                  </span>
+
                   {/* Expand indicator */}
                   <span
                     className={`text-earth-600 text-xs shrink-0 transition-transform ${
@@ -443,6 +486,14 @@ export default function Home() {
                       )}
                     </span>
                   )}
+
+                  {/* Age timer */}
+                  <span
+                    className={`font-[family-name:var(--font-pixel)] text-[7px] shrink-0 leading-relaxed ${ageColor(task.createdAt, now)}`}
+                    title={`Created ${new Date(task.createdAt).toLocaleDateString()}`}
+                  >
+                    {formatAge(task.createdAt, now)}
+                  </span>
 
                   <div
                     className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity"
